@@ -2,8 +2,8 @@
 Name : extQueriedWebClient
 Author : Wieland@AMB-ZEPH15
 Version : 0
-Build : 2
-Savetimestamp : 2023-06-17T19:30:24.804459
+Build : 4
+Savetimestamp : 2023-06-17T19:34:06.304126
 Saveorigin : Project.toe
 Saveversion : 2022.32660
 Info Header End'''
@@ -22,6 +22,7 @@ class extQueriedWebClient:
 		self.current_request = None
 		self.ownerComp.op("status").par.value0 = 0
 		self.Processing = tdu.Dependency( False )
+		self.Exceptions = quriedwebclient_exceptions
 	
 	@property 
 	def server(self):
@@ -29,7 +30,7 @@ class extQueriedWebClient:
 	
 	def Timeout(self):
 		self.ownerComp.op("webclient").par.stop.pulse()
-		self.ownerComp.op("callbackManager").Do_Callback("onTimeout", self.current_request)
+		self.ownerComp.op("callbackManager").Do_Callback("onTimeout", self.current_request, self.ownerComp)
 
 		self.current_request = None
 		self.active = False
@@ -42,7 +43,7 @@ class extQueriedWebClient:
 		if not self.requests: 
 			self.ownerComp.op("status").par.value0 = 0
 			self.Processing.val = False
-			return self.ownerComp.op("callbackManager").Execute("onQueryEmpty")()
+			return self.ownerComp.op("callbackManager").Do_Callback("onQueryEmpty", self.ownerComp)
 		self.Processing.val = True
 		self.active = True
 		self.current_request = self.requests.pop(0)
@@ -50,7 +51,6 @@ class extQueriedWebClient:
 		return
 		
 	def parse_body(self, data):
-
 		return json.dumps( data ) if type(data) is dict else data
 	
 	
@@ -118,13 +118,14 @@ class extQueriedWebClient:
 			self.ownerComp.op("callbackManager").Do_Callback("onError", current_request, 
 																		 response_dict, 
 																		 exception, 
-																		 quriedwebclient_exceptions )
+																		 self.ownerComp )
 		else:
 			self.ownerComp.op("callbackManager").Do_Callback("onResponse" , current_request,
-																			response_dict )
+																			response_dict,
+																			self.ownerComp )
 			
 			try:
-				current_request["callback"]( parsed_data )
+				current_request["callback"]( current_request, response_dict, self.ownerComp )
 			except Exception as e:
 				debug("Error in Request_Callback", e, current_request)
 			
